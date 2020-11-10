@@ -1,9 +1,9 @@
 echo remove build and dist.....
-rm -rf /home/pi/auto_test/build
-rm -rf /home/pi/auto_test/dist
+rm -rf /home/pi/PiCamera/build
+rm -rf /home/pi/PiCamera/dist
 
 echo generate exe.....
-pyinstaller -F /home/pi/auto_test/camera.py
+pyinstaller -F /home/pi/PiCamera/camera.py
 
 echo remove exe from /usr/local/bin
 rm /usr/local/bin/camera

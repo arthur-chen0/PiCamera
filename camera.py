@@ -24,7 +24,7 @@ condition = threading.Condition()
 camera = picamera.PiCamera()    
 camera.brightness = args.brightness
 camera.rotation = args.rotation
-path = os.path.abspath('/home/pi/auto_test/photo')
+path = os.path.abspath('/home/pi/PiCamera/photo')
 
 print("\nVersion: 1.2 \n")
 print("Ctrl + C to force stop capture or recording!!\n")
