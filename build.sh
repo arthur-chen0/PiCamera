@@ -9,4 +9,4 @@ echo remove exe from /usr/local/bin
 rm /usr/local/bin/camera
 
 echo copy exe to /usr/local/bin
-cp /home/pi/auto_test/dist/camera /usr/local/bin/
+cp /home/pi/PiCamera/dist/camera /usr/local/bin/
