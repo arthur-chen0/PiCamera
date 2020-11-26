@@ -5,13 +5,18 @@ import sys
 import threading
 import signal
 import socket
+import argparse
 from time import sleep
 from database import db, time_now
+
+parser = argparse.ArgumentParser(description='camera listener.')
+parser.add_argument('-p','--path',help='Directory on the server',default='photo')
+args = parser.parse_args()
 
 db.setup("asyncio")
 
 def cameraTask():
-    os.system('python3 camera.py -s 5 -p photo2 -u')
+    os.system('python3 camera.py -s 5 -u -p ' + str(args.path))
     # print('Camera task done')
 
 def terminateCameraTask():
