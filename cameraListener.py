@@ -15,6 +15,7 @@ def cameraTask():
     # print('Camera task done')
 
 def terminateCameraTask():
+    # print("terminate camera task")
     pid = open("/home/pi/PiCamera/pid.txt")
     cameraPid = pid.readline()
     try:
@@ -74,7 +75,7 @@ async def changefeed():
     async for change in changes:
         # print("changefeed " + str(change))
         changeStatus = change.get('new_val').get('status',False)
-        print("========================= " + changeStatus + " =========================")
+        print("============================== " + changeStatus + " ==============================")
         preState = currentState
 
         if 'power on' in changeStatus:
@@ -87,9 +88,11 @@ async def changefeed():
             cameraTimer.start()
 
         elif 'power off' in changeStatus:
-            if 'cameraTimer' in locals():
+            if cameraTimer is not None:
                 cameraTimer.cancel()
+                cameraTimer = None
             terminateCameraTask()
+            terminateCameraTask() #make sure camera task be terminated
             currentState = False
         else:
             pass

@@ -24,7 +24,7 @@ parser.add_argument('-u',help='update state to DB',action='store_true')
 
 args = parser.parse_args()
 condition = threading.Condition()
-camera = picamera.PiCamera()    
+camera = picamera.PiCamera() 
 camera.brightness = args.brightness
 camera.rotation = args.rotation
 path = os.path.abspath('/home/pi/PiCamera/photo')
@@ -45,11 +45,16 @@ def getPid():
     cameraPid.writelines(str(pid))
     cameraPid.close()
 
+def countdown(sleepTime):
+    for secs in range(sleepTime, 0, -1):
+        print('sleep ', secs, end=' \r')
+        time.sleep(1)
+    print("          ")
+
 firstCap = False
 def capture():
     global firstCap
-    print("sleep " + str(args.sleep))
-    time.sleep(args.sleep)
+    countdown(args.sleep)
     date = datetime.datetime.today().strftime("%m_%d_%H_%M_%S")
     if not firstCap:
         date = date + "_on" # this is for image web filtering
@@ -61,6 +66,9 @@ def capture():
 
     if not firstCap:
         firstCap = True
+
+    if args.u:
+        updateStateToServer()
 
 def recording():
     condition.acquire()
@@ -128,9 +136,6 @@ try:
             print("Capture while loop\n")
             while True:
                 capture()
-                if args.u:
-                    updateStateToServer()
-            # camera.close()
             
         else:
             print("Capture " + str(args.time) + " times\n")
