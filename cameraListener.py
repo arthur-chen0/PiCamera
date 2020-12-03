@@ -6,6 +6,7 @@ import threading
 import signal
 import socket
 import argparse
+import datetime
 from time import sleep
 from database import db, time_now
 
@@ -14,6 +15,8 @@ parser.add_argument('-p','--path',help='Directory on the server',default='photo'
 args = parser.parse_args()
 
 db.setup("asyncio")
+test_id = datetime.datetime.today().strftime("%Y%m%d%H%M%S")
+start_time = time_now()
 
 def cameraTask():
     os.system('python3 camera.py -s 5 -u -p ' + str(args.path))
@@ -43,15 +46,29 @@ async def updateCount(count):
     tableData = dict()
     tableData['reboot_Times'] = count
     rec = await db.table('cameraAlive').get(str(ipaddr)).update(tableData)
+    await updateResult(count)
     # assert rec['error'] == 0
 
 async def updateResult(count):
     ipaddr = getIpAddress()
-    tableData = dict()
-    tableData['time'] = time_now()
-    tableData['ip'] = ipaddr
-    tableData['reboot_Times'] = count
-    rec = await db.table('testResult').insert(tableData)
+    rec = await db.table('testResult').get(str(test_id)).run()
+    if rec is None:
+        tableData = dict()
+        tableData['test_id'] = str(test_id)
+        tableData['start_time'] = start_time
+        tableData['end_time'] = time_now()
+        tableData['ip'] = ipaddr
+        tableData['reboot_Times'] = count
+        rec = await db.table('testResult').insert(tableData)
+        # print(rec)
+    else:
+        tableData = dict()
+        tableData['end_time'] = time_now()
+        tableData['reboot_Times'] = count
+        rec = await db.table('testResult').get(str(test_id)).update(tableData)
+        # print(rec)
+
+    
 
 # async def get_connection():
 #     return await r.connect(dbSettings.RDB_HOST, dbSettings.RDB_PORT)
@@ -75,6 +92,7 @@ async def changefeed():
     preState = False
     currentState = False
     power_on_time = await getPowerOnTime()
+    await updateResult(count)
 
     changes = await db.table('powerstate').watch()
     async for change in changes:
@@ -97,6 +115,7 @@ async def changefeed():
                 cameraTimer.cancel()
                 cameraTimer = None
             terminateCameraTask()
+            sleep(1)
             terminateCameraTask() #make sure camera task be terminated
             currentState = False
         else:
@@ -110,7 +129,7 @@ async def changefeed():
 loop = None
 def quit(signum, frame):
     global count,loop
-    os.system("python3 /home/pi/PiCamera/updateResult.py -t " + str(count))
+    # os.system("python3 /home/pi/PiCamera/updateResult.py -t " + str(count))
     if cameraTimer is not None:
         cameraTimer.cancel()
     loop.close()
@@ -119,7 +138,7 @@ def quit(signum, frame):
 try:
     signal.signal(signal.SIGINT, quit)
     signal.signal(signal.SIGTERM, quit)
-
+    
     loop = asyncio.get_event_loop()
     loop.create_task(changefeed())
     loop.run_forever()

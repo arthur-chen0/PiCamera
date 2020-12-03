@@ -25,7 +25,7 @@ class DB(object):
         },
         "testResult": {
             "name": "testResult",
-            "primary_key": "time",
+            "primary_key": "test_id",
         }
     }
 # ==================================DB Init=========================================
