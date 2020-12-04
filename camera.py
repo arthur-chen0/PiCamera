@@ -36,6 +36,7 @@ if not os.path.exists(path):
 
 print("\nVersion: 1.2 \n")
 print("Ctrl + C to force stop capture or recording!!\n")
+print("Directory on the server " + args.path)
 print("resolution: " + str(args.r[0]) + " * " + str(args.r[1]))
 
 def getPid():
@@ -125,7 +126,7 @@ def quit(signum, frame):
 try:
     signal.signal(signal.SIGINT, quit)
     signal.signal(signal.SIGTERM, quit)
-    getPid()
+    # getPid()
     db.setup()
     ipaddr = getIpAddress()
 

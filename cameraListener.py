@@ -1,13 +1,14 @@
 
 import asyncio
-import os
 import sys
 import threading
 import signal
 import socket
 import argparse
 import datetime
+import psutil
 from time import sleep
+from subprocess import Popen
 from database import db, time_now
 
 parser = argparse.ArgumentParser(description='camera listener.')
@@ -19,17 +20,16 @@ test_id = datetime.datetime.today().strftime("%Y%m%d%H%M%S")
 start_time = time_now()
 
 def cameraTask():
-    os.system('python3 camera.py -s 5 -u -p ' + str(args.path))
-    # print('Camera task done')
+    Popen(['python3','camera.py','-s','5','-u','-p',str(args.path)])
 
 def terminateCameraTask():
-    # print("terminate camera task")
-    pid = open("/home/pi/PiCamera/pid.txt")
-    cameraPid = pid.readline()
-    try:
-        os.system("kill -2 " + cameraPid)
-    except Exception as e:
-        print(e)
+    for process in psutil.process_iter():
+        cmdLine = process.cmdline()
+        if 'python3' in cmdLine and 'camera.py' in cmdLine:
+            print("Camera task found, terminate it ")
+            process.terminate()
+            return;
+    print("Camser task do not found.")
 
 def getIpAddress():
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -115,8 +115,8 @@ async def changefeed():
                 cameraTimer.cancel()
                 cameraTimer = None
             terminateCameraTask()
-            sleep(1)
-            terminateCameraTask() #make sure camera task be terminated
+            # sleep(1)
+            # terminateCameraTask() #make sure camera task be terminated
             currentState = False
         else:
             pass
@@ -129,7 +129,6 @@ async def changefeed():
 loop = None
 def quit(signum, frame):
     global count,loop
-    # os.system("python3 /home/pi/PiCamera/updateResult.py -t " + str(count))
     if cameraTimer is not None:
         cameraTimer.cancel()
     loop.close()

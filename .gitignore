@@ -135,3 +135,4 @@ photo/
 camera.spec
 camera_test.spec
 pid.txt
+test.py
