@@ -4,11 +4,15 @@ import sys
 import threading
 import signal
 import socket
+import psutil
 import argparse
 import datetime
-import psutil
-from time import sleep
+import traceback
+import logging
+import logging.config
+from loggingConfig import LOGGING
 from subprocess import Popen
+from time import sleep
 from database import db, time_now
 
 parser = argparse.ArgumentParser(description='camera listener.')
@@ -19,6 +23,42 @@ db.setup("asyncio")
 test_id = datetime.datetime.today().strftime("%Y%m%d%H%M%S")
 start_time = time_now()
 
+# logging.config.fileConfig('logging.conf', defaults={'date':datetime.datetime.now().strftime('%m_%d_%H_%M_%S')})
+LOGGING['handlers']['debug']['filename'] = datetime.datetime.now().strftime('listener_%m_%d_%H_%M_%S.log')
+LOGGING['handlers']['error']['filename'] = datetime.datetime.now().strftime('listener_error_%m_%d_%H_%M_%S.log')
+
+logging.config.dictConfig(config=LOGGING)
+log_c = logging.getLogger('console')
+log_d = logging.getLogger('DebugLogger')
+log_e = logging.getLogger('ErrorLogger')
+
+s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+s.connect(('google.com', 0))
+ipaddr = s.getsockname()[0]
+
+def exceptionHandler(e):
+    error_class = e.__class__.__name__ #取得錯誤類型
+    detail = e.args[0] #取得詳細內容
+    cl, exc, tb = sys.exc_info() #取得Call Stack
+    lastCallStack = traceback.extract_tb(tb)[-1] #取得Call Stack的最後一筆資料
+    fileName = lastCallStack[0] #取得發生的檔案名稱
+    lineNum = lastCallStack[1] #取得發生的行號
+    funcName = lastCallStack[2] #取得發生的函數名稱
+    errMsg = "File \"{}\", line {}, in {}: [{}] {}".format(fileName, lineNum, funcName, error_class, detail)
+    loge(errMsg)
+
+def logi(message):
+    log_c.info(str(message))
+    log_d.info(str(message))
+
+def logd(message):
+    log_d.debug(str(message))
+
+def loge(message):
+    log_c.error(str(message))
+    log_d.error(str(message))
+    log_e.error(str(message))
+
 def cameraTask():
     Popen(['python3','camera.py','-s','5','-u','-p',str(args.path)])
 
@@ -26,10 +66,10 @@ def terminateCameraTask():
     for process in psutil.process_iter():
         cmdLine = process.cmdline()
         if 'python3' in cmdLine and 'camera.py' in cmdLine:
-            print("Camera task found, terminate it ")
+            logi('camera task found. Terminating it.')
             process.terminate()
-            return;
-    print("Camser task do not found.")
+            return  
+    logi('camera not found')
 
 def getIpAddress():
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -37,20 +77,23 @@ def getIpAddress():
     return s.getsockname()[0]
 
 async def getPowerOnTime():
-    ipaddr = getIpAddress()
+    global ipaddr
     rec = await db.table('cameraAlive').get(str(ipaddr)).run()
+    logd(str(rec))
     return int(rec.get('power_on_time'))
 
 async def updateCount(count):
-    ipaddr = getIpAddress()
+    global ipaddr
     tableData = dict()
     tableData['reboot_Times'] = count
     rec = await db.table('cameraAlive').get(str(ipaddr)).update(tableData)
+    logd(str(rec))
     await updateResult(count)
+    sleep(1)
     # assert rec['error'] == 0
 
 async def updateResult(count):
-    ipaddr = getIpAddress()
+    global ipaddr
     rec = await db.table('testResult').get(str(test_id)).run()
     if rec is None:
         tableData = dict()
@@ -60,31 +103,18 @@ async def updateResult(count):
         tableData['ip'] = ipaddr
         tableData['reboot_Times'] = count
         rec = await db.table('testResult').insert(tableData)
+        logd(str(rec))
         # print(rec)
     else:
         tableData = dict()
         tableData['end_time'] = time_now()
         tableData['reboot_Times'] = count
         rec = await db.table('testResult').get(str(test_id)).update(tableData)
+        logd(str(rec))
         # print(rec)
+    sleep(1)
 
     
-
-# async def get_connection():
-#     return await r.connect(dbSettings.RDB_HOST, dbSettings.RDB_PORT)
-
-# async def changefeed_old():
-
-#     conn = await get_connection()
-#     changes = await r.db("picamera").table("camera").changes()["new_val"].run(conn)
-#     async for change in changes:
-#         print("changefeed_old " + str(change))
-
-# async def changefeed_new():
-#     conn = await get_connection()
-#     changes = await r.db("picamera").table("camera").changes()["old_val"].run(conn)
-#     async for change in changes:
-#         print("changefeed_new " + str(change))
 cameraTimer = None
 count = 0
 async def changefeed():
@@ -94,37 +124,40 @@ async def changefeed():
     power_on_time = await getPowerOnTime()
     await updateResult(count)
 
-    changes = await db.table('powerstate').watch()
-    async for change in changes:
-        # print("changefeed " + str(change))
-        changeStatus = change.get('new_val').get('status',False)
-        print("============================== " + changeStatus + " ==============================")
-        preState = currentState
+    try:
+        changes = await db.table('powerstategit').watch()
+        async for change in changes:
+            logd("changefeed " + str(change))
+            changeStatus = change.get('new_val').get('status',False)
+            logi("============================== " + changeStatus + " ==============================")
+            preState = currentState
 
-        if 'power on' in changeStatus:
-            currentState = True
+            if 'power on' in changeStatus:
+                currentState = True
 
-            t = threading.Thread(target = cameraTask)
-            t.start()
+                t = threading.Thread(target = cameraTask)
+                t.start()
 
-            cameraTimer = threading.Timer(power_on_time + 30, terminateCameraTask)
-            cameraTimer.start()
+                cameraTimer = threading.Timer(power_on_time + 30, terminateCameraTask)
+                cameraTimer.start()
 
-        elif 'power off' in changeStatus:
-            if cameraTimer is not None:
-                cameraTimer.cancel()
-                cameraTimer = None
-            terminateCameraTask()
-            # sleep(1)
-            # terminateCameraTask() #make sure camera task be terminated
-            currentState = False
-        else:
-            pass
+            elif 'power off' in changeStatus:
+                if cameraTimer is not None:
+                    cameraTimer.cancel()
+                    cameraTimer = None
+                terminateCameraTask()
+                # sleep(1)
+                # terminateCameraTask() #make sure camera task be terminated
+                currentState = False
+            else:
+                pass
 
-        if(preState and not currentState):
-            count += 1
-            print("reboot times: " + str(count))
-        await updateCount(count)
+            if(preState and not currentState):
+                count += 1
+                logi("reboot times: " + str(count))
+                await updateCount(count)
+    except Exception as exc:
+        exceptionHandler(exc)
 
 loop = None
 def quit(signum, frame):
@@ -143,5 +176,5 @@ try:
     loop.run_forever()
 
 except Exception as exc:
-        print("Excetption: " + str(exc))
+    exceptionHandler(exc)
 

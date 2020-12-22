@@ -1,5 +1,6 @@
 import datetime
 import json
+import os
 
 from rethinkdb import RethinkDB
 from logzero import logger
@@ -26,7 +27,11 @@ class DB(object):
         "testResult": {
             "name": "testResult",
             "primary_key": "test_id",
-        }
+        },
+        "powerstateTest": {
+            "name": "powerstateTest",
+            "primary_key": "time",
+        },
     }
 # ==================================DB Init=========================================
     def __init__(self, db='demo', **kwargs):
@@ -71,11 +76,11 @@ class DB(object):
         return await r.connect(db=self.__dbname, **self.__connect_kwargs)
 # ==================================DB run for sync==========================================
     async def run_sync(self, rsql):
-        c = await self.connection()
+        c = await self.connection_sync()
         try:
             return await rsql.run(c)
-        finally:
-            c.close()
+        finally:  
+            await c.close(noreply_wait=False)
 # ==================================DB connection===================================
     def connection(self):
         return r.connect(db=self.__dbname, **self.__connect_kwargs)
@@ -85,7 +90,7 @@ class DB(object):
         try:
             return rsql.run(c)
         finally:
-            c.close()
+            c.close(noreply_wait=False)
 # ==================================================================================
 
 
@@ -183,26 +188,43 @@ class TableHelper_sync(object):
 
     async def update(self, *args, **kwargs):
         conn = await self.__db.connection_sync()
-        return await self.__reql.update(*args, **kwargs).run(conn)
+        try:
+            return await self.__reql.update(*args, **kwargs).run(conn)
+        finally:
+            await conn.close(noreply_wait=False)
+        
 
     async def insert(self, *args, **kwargs):
         conn = await self.__db.connection_sync()
-        return await self.__reql.insert(*args, **kwargs).run(conn) 
+        try:
+            return await self.__reql.insert(*args, **kwargs).run(conn) 
+        finally:
+            await conn.close(noreply_wait=False)
 
     async def delete(self, *args, **kwargs):
         conn = await self.__db.connection_sync()
-        return await self.__reql.delete(*args, **kwargs).run(conn) 
+        try:
+            return await self.__reql.delete(*args, **kwargs).run(conn) 
+        finally:
+            await conn.close(noreply_wait=False)
 
     async def replace(self, *args, **kwargs):
         conn = await self.__db.connection_sync()
-        return await self.__reql.replace(*args, **kwargs).run(conn) 
+        try:
+            return await self.__reql.replace(*args, **kwargs).run(conn) 
+        finally:
+            await conn.close(noreply_wait=False)
 
     async def count(self):
         conn = await self.__db.connection_sync()
-        return await self.__reql.count().run(conn) 
+        try:
+            return await self.__reql.count().run(conn) 
+        finally:
+            await conn.close(noreply_wait=False)
 
     async def run(self):
         return await self.__db.run_sync(self.__reql)
+            
 
     async def watch(self):
         conn = await self.__db.connection_sync()

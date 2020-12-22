@@ -59,7 +59,7 @@ def capture():
     date = datetime.datetime.today().strftime("%m_%d_%H_%M_%S")
     if not firstCap:
         date = date + "_on" # this is for image web filtering
-    pictureName = path + "/" +str(date) + ".jpg"
+    pictureName = path + "/" + str(date) + ".jpg"
     print("Take picture: " + pictureName)
     camera.resolution = (args.r[0], args.r[1])
     camera.capture(pictureName)
