@@ -1,6 +1,7 @@
 
 import asyncio
 import sys
+import os
 import threading
 import signal
 import socket
@@ -8,6 +9,7 @@ import psutil
 import argparse
 import datetime
 import traceback
+import inspect
 import logging
 import logging.config
 from loggingConfig import LOGGING
@@ -23,9 +25,12 @@ db.setup("asyncio")
 test_id = datetime.datetime.today().strftime("%Y%m%d%H%M%S")
 start_time = time_now()
 
-# logging.config.fileConfig('logging.conf', defaults={'date':datetime.datetime.now().strftime('%m_%d_%H_%M_%S')})
-LOGGING['handlers']['debug']['filename'] = datetime.datetime.now().strftime('listener_%m_%d_%H_%M_%S.log')
-LOGGING['handlers']['error']['filename'] = datetime.datetime.now().strftime('listener_error_%m_%d_%H_%M_%S.log')
+filePath = os.path.abspath('/home/pi/PiCamera/log/')
+if not os.path.exists(filePath):
+    os.makedirs(filePath)
+
+LOGGING['handlers']['debug']['filename'] = datetime.datetime.now().strftime(filePath + '/listener_%m_%d_%H_%M_%S.log')
+LOGGING['handlers']['error']['filename'] = datetime.datetime.now().strftime(filePath + '/listener_error_%m_%d_%H_%M_%S.log')
 
 logging.config.dictConfig(config=LOGGING)
 log_c = logging.getLogger('console')
@@ -44,7 +49,7 @@ def exceptionHandler(e):
     fileName = lastCallStack[0] #取得發生的檔案名稱
     lineNum = lastCallStack[1] #取得發生的行號
     funcName = lastCallStack[2] #取得發生的函數名稱
-    errMsg = "File \"{}\", line {}, in {}: [{}] {}".format(fileName, lineNum, funcName, error_class, detail)
+    errMsg = "File \"{}\", line {}, in {}(): [{}] {}".format(fileName, lineNum, funcName, error_class, detail)
     loge(errMsg)
 
 def logi(message):
@@ -52,24 +57,33 @@ def logi(message):
     log_d.info(str(message))
 
 def logd(message):
-    log_d.debug(str(message))
+    curframe = inspect.currentframe()
+    calframe = inspect.getouterframes(curframe, 2)
+    logMsg = calframe[1][3] + '(): ' + str(message)
+    log_d.debug(logMsg)
 
 def loge(message):
-    log_c.error(str(message))
-    log_d.error(str(message))
-    log_e.error(str(message))
+    curframe = inspect.currentframe()
+    calframe = inspect.getouterframes(curframe, 2)
+    logMsg = calframe[1][3] + '(): ' + str(message)
+    log_c.error(logMsg)
+    log_d.error(logMsg)
+    log_e.error(logMsg)
 
 def cameraTask():
     Popen(['python3','camera.py','-s','5','-u','-p',str(args.path)])
 
 def terminateCameraTask():
+    isFound = False
+    sleep(0.5)
     for process in psutil.process_iter():
         cmdLine = process.cmdline()
         if 'python3' in cmdLine and 'camera.py' in cmdLine:
             logi('camera task found. Terminating it.')
             process.terminate()
-            return  
-    logi('camera not found')
+            isFound = True
+    if not isFound:  
+        logi('camera task does not found')
 
 def getIpAddress():
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -125,7 +139,7 @@ async def changefeed():
     await updateResult(count)
 
     try:
-        changes = await db.table('powerstategit').watch()
+        changes = await db.table('powerstate').watch()
         async for change in changes:
             logd("changefeed " + str(change))
             changeStatus = change.get('new_val').get('status',False)
@@ -146,8 +160,6 @@ async def changefeed():
                     cameraTimer.cancel()
                     cameraTimer = None
                 terminateCameraTask()
-                # sleep(1)
-                # terminateCameraTask() #make sure camera task be terminated
                 currentState = False
             else:
                 pass

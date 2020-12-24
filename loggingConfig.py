@@ -1,13 +1,12 @@
 import logging
 import logging.config
 
-
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
     'formatters': {
         'normal': {
-            'format': '%(asctime)s - %(levelname)s : %(message)s'
+            'format': '%(asctime)s - %(process)d %(levelname)s / %(message)s'
         },
         'simple': {
             'format': '%(message)s'
