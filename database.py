@@ -28,10 +28,10 @@ class DB(object):
             "name": "testResult",
             "primary_key": "test_id",
         },
-        "powerstateTest": {
-            "name": "powerstateTest",
-            "primary_key": "time",
-        },
+        "photo": {
+            "name": "photo"
+        }
+
     }
 # ==================================DB Init=========================================
     def __init__(self, db='demo', **kwargs):

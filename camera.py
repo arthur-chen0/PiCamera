@@ -69,7 +69,7 @@ def capture():
         firstCap = True
 
     if args.u:
-        updateStateToServer()
+        updateStateToServer(date)
 
 def recording():
     condition.acquire()
@@ -95,12 +95,18 @@ def copyVideoToServer():
     os.system("scp " + path + "/*.mjpeg" + " jhtrd@192.168.70.187:/home/jhtrd/auto_test/video/")
     os.system("rm " + path + "/*.mjpeg")
 
-def updateStateToServer():
+def updateStateToServer(name):
     data = dict()
     data['ip'] = str(ipaddr)
     data['date'] = time_now()
     data['capture'] = 'on'
     rec = db.table('cameraAlive').get(str(ipaddr)).update(data)
+
+    data = dict()
+    data['ip'] = str(ipaddr)
+    data['name'] = str(name)
+    data['date'] = time_now()
+    rec = db.table('photo').insert(data)
 
 def getIpAddress():
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
